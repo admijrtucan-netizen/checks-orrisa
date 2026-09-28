@@ -45,6 +45,21 @@ jobs:
         with:
           node-version: 22
 
+      # Corta aqui con un mensaje claro en vez de dejar que google-github-actions/auth
+      # truene con su error generico ("must specify exactly one of..."). Ese error NO
+      # es un bug del workflow: significa que a este repo todavia le falta configurar
+      # sus secretos. Pasos exactos (comandos y roles) en el README, seccion
+      # "Puesta en marcha".
+      - name: Verificar que los secretos esten configurados
+        run: |
+          faltan=""
+          [ -z "${{ secrets.GCP_SA_KEY }}" ] && faltan="$faltan GCP_SA_KEY"
+          [ -z "${{ secrets.CHECKS_WEBHOOK_URL }}" ] && faltan="$faltan CHECKS_WEBHOOK_URL"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos del repo:$faltan — Settings > Secrets and variables > Actions. Ver README, seccion 'Puesta en marcha' (bucket, cuenta de servicio y estos dos secretos)."
+            exit 1
+          fi
+
       # Secreto GCP_SA_KEY = llave JSON de la cuenta de servicio de CHECKS
       # (checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com).
       - uses: google-github-actions/auth@v2

@@ -30,26 +30,35 @@ Workflow: `.github/workflows/checks.yml`. Corre en tres casos:
 
 ## Puesta en marcha (una sola vez)
 
-CHECKS lleva su **propio bucket y su propia cuenta de servicio**, con nombre de CHECKS.
+**Esto NO lo puede hacer Claude.** Requiere una cuenta con permisos de administrador sobre el proyecto de Google Cloud `bases-de-datos-sheets` y sobre este repo de GitHub — credenciales que Claude nunca debe recibir. Lo hace a mano quien ya tenga ambos accesos (hoy, Mario o Andrea). Sin esto, **toda corrida del workflow falla en el primer paso**, incluidas las automáticas de lunes/miércoles/viernes — no es un error de código, es que faltan estos cuatro pasos.
 
-1. **Bucket** público de solo lectura (`checks-orrisa`, o el que se quiera; en ese caso definir la variable de repo `CHECKS_BUCKET`):
-   ```bash
-   gcloud storage buckets create gs://checks-orrisa --project=bases-de-datos-sheets --location=US --uniform-bucket-level-access
-   gcloud storage buckets add-iam-policy-binding gs://checks-orrisa --member=allUsers --role=roles/storage.objectViewer
-   ```
-2. **Cuenta de servicio** `checks-orrisa` con permisos mínimos:
-   ```bash
-   gcloud iam service-accounts create checks-orrisa --project=bases-de-datos-sheets
-   SA=checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com
-   gcloud projects add-iam-policy-binding bases-de-datos-sheets --member=serviceAccount:$SA --role=roles/bigquery.jobUser
-   bq query --use_legacy_sql=false --project_id=bases-de-datos-sheets "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`bases-de-datos-sheets.ASANA\` TO 'serviceAccount:$SA'"
-   gcloud storage buckets add-iam-policy-binding gs://checks-orrisa --member=serviceAccount:$SA --role=roles/storage.objectAdmin
-   ```
-3. **Secretos** del repo (Settings → Secrets and variables → Actions → Secrets):
-   - `GCP_SA_KEY`: la llave JSON de esa cuenta (`gcloud iam service-accounts keys create llave.json --iam-account=$SA`).
-   - `CHECKS_WEBHOOK_URL`: la URL del webhook de n8n. **Es un secreto: no va en el código, ni en Issues, ni en el README.**
-4. Correr el workflow a mano con `modo = prueba` y confirmar en n8n que llega el evento.
-5. Correr a mano con `modo = normal`. **La primera corrida solo registra la línea base y no envía nada** (para no inundar el canal). Si se quieren recibir de inmediato las alertas que ya están activas, correr una vez con `modo = todo`.
+**Dónde correr los comandos:** [console.cloud.google.com](https://console.cloud.google.com) → ícono `>_` (Cloud Shell) arriba a la derecha, con la cuenta de Google que administra `bases-de-datos-sheets`. No hace falta instalar nada.
+
+Bloque único, para pegar tal cual (crea el bucket, la cuenta de servicio, sus permisos y la llave; abre el login de GitHub y deja los dos secretos listos):
+
+```bash
+PROJECT=bases-de-datos-sheets; BUCKET=checks-orrisa; SA=checks-orrisa@$PROJECT.iam.gserviceaccount.com
+
+gcloud storage buckets create gs://$BUCKET --project=$PROJECT --location=US --uniform-bucket-level-access
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET --member=allUsers --role=roles/storage.objectViewer
+
+gcloud iam service-accounts create checks-orrisa --project=$PROJECT
+gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$SA --role=roles/bigquery.jobUser
+bq query --use_legacy_sql=false --project_id=$PROJECT "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`$PROJECT.ASANA\` TO 'serviceAccount:$SA'"
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET --member=serviceAccount:$SA --role=roles/storage.objectAdmin
+
+gcloud iam service-accounts keys create llave.json --iam-account=$SA
+gh auth login                                                            # navegador, GitHub.com, HTTPS
+gh secret set GCP_SA_KEY --repo admijrtucan-netizen/checks-orrisa < llave.json
+gh secret set CHECKS_WEBHOOK_URL --repo admijrtucan-netizen/checks-orrisa   # pide pegar la URL del webhook de n8n
+rm llave.json
+```
+
+(Si `gh` no está instalado en Cloud Shell, `sudo apt-get install gh -y` primero, o crear los dos secretos a mano en Settings → Secrets and variables → Actions.)
+
+**Verificar que quedó bien:** Actions → `CHECKS · actualizar tablero y alertas` → *Run workflow* con `modo = prueba`. Si el paso *Verificar que los secretos estén configurados* pasa en verde y el evento de prueba llega a n8n, ya está. Luego correr una vez con `modo = normal` (o `modo = todo` para recibir de una vez las alertas ya activas — la primera corrida en modo normal solo registra la línea base, sin enviar nada).
+
+**La llave `llave.json` es una credencial.** Vive solo en esa terminal de Cloud Shell, nunca se pega en el chat de Claude ni se sube al repo — por eso el comando la borra al final.
 
 ## Alertas que se envían
 
@@ -112,6 +121,15 @@ DRY_RUN=1 MODO=todo node checks/checks_enviar.js salida/checks-alertas.json prev
 ```
 
 Requiere Node 18+ (usa `fetch`). Sin dependencias.
+
+## Errores esperados antes de la puesta en marcha
+
+| Error en Actions | Causa | Solución |
+|---|---|---|
+| `Verificar que los secretos estén configurados` falla, o (en corridas de antes de este paso) `google-github-actions/auth failed with: the GitHub Action workflow must specify exactly one of "workload_identity_provider" or "credentials_json"` | Faltan `GCP_SA_KEY` y/o `CHECKS_WEBHOOK_URL` en Settings → Secrets and variables → Actions. | Sección **Puesta en marcha** de arriba. |
+| `Consultar tareas de Asana en BigQuery` falla con `Access Denied` o `403` | La cuenta de servicio existe pero le falta el `GRANT` sobre `ASANA`, o la llave del secreto es de otra cuenta. | Repetir el bloque de `bq query ... GRANT ...` de la Puesta en marcha con la cuenta correcta. |
+| `Publicar tablero` o `Guardar estado` fallan con `403`/`Forbidden` | Falta el rol `storage.objectAdmin` de la cuenta de servicio sobre el bucket. | Repetir el `add-iam-policy-binding` del bucket. |
+| `Enviar alertas al webhook` falla o dice `CHECKS_WEBHOOK_URL no está configurado` | Falta o cambió el secreto `CHECKS_WEBHOOK_URL`. | `gh secret set CHECKS_WEBHOOK_URL --repo admijrtucan-netizen/checks-orrisa`. |
 
 ## Notas de operación
 
