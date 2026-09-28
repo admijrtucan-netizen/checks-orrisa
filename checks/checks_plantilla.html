@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHECKS · ORRISA</title>
+<meta name="description" content="CHECKS — control de hitos de obra de ORRISA: cada tarea ligada a su hito y una alarma cuando un hito se ejecuta sin cerrar lo anterior.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --orange: #F26B21;
+  --orange-strong: #C94E08;
+  --orange-tint: #FFF1E8;
+  --orange-line: #F9C9A8;
+  --paper: #FFFFFF;
+  --surface: #FFFFFF;
+  --wash: #FAF7F4;
+  --ink: #1B1712;
+  --ink-2: #5A5148;
+  --muted: #8A8078;
+  --line: #EDE4DC;
+  --good: #1E7B3A;
+  --good-bg: #E8F5EC;
+  --crit: #C62828;
+  --crit-bg: #FDECEC;
+  --warn: #9A5B00;
+  --warn-bg: #FFF4DB;
+  --shadow: 0 1px 2px rgba(27,23,18,.06), 0 10px 28px -14px rgba(27,23,18,.22);
+  --display: 'Syncopate', 'Arial Black', sans-serif;
+  --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 15px/1.5 var(--body); }
+a { color: var(--orange-strong); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* Marca */
+.top { border-bottom: 6px solid var(--orange); background: var(--paper); }
+.top .wrap { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 22px; padding-bottom: 18px; }
+.crumbs { display: flex; gap: 8px; align-items: center; font: 700 10px/1 var(--display); letter-spacing: .14em; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; }
+.crumbs span:last-child { color: var(--orange-strong); }
+.crumbs i { font-style: normal; color: var(--orange-line); }
+.brand { font: 700 clamp(30px, 6vw, 56px)/1 var(--display); letter-spacing: .04em; margin: 0; text-transform: uppercase; }
+.brand b { color: var(--orange); font-weight: 700; }
+.tag { font: 400 11px/1.4 var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin: 10px 0 0; }
+.corte { text-align: right; font-size: 13px; color: var(--ink-2); }
+.corte strong { display: block; font: 700 12px/1 var(--display); letter-spacing: .1em; color: var(--ink); margin-bottom: 6px; text-transform: uppercase; }
+
+main { padding: 28px 0 60px; }
+h2.sec { font: 700 13px/1.2 var(--display); letter-spacing: .14em; text-transform: uppercase; margin: 40px 0 6px; display: flex; align-items: center; gap: 10px; }
+h2.sec::before { content: ""; width: 22px; height: 6px; background: var(--orange); flex: none; }
+.sub { color: var(--ink-2); margin: 0 0 16px; max-width: 70ch; font-size: 14px; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 16px 14px; box-shadow: var(--shadow); border-top: 4px solid var(--orange); }
+.kpi.crit { border-top-color: var(--crit); }
+.kpi .lb { font: 700 9.5px/1.3 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); min-height: 26px; }
+.kpi .n { font: 700 34px/1 var(--display); margin-top: 8px; letter-spacing: .02em; }
+.kpi .n small { font-size: 15px; color: var(--muted); font-weight: 400; }
+.kpi .ft { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.kpi.crit .n { color: var(--crit); }
+
+/* Alarmas */
+.alarmas { display: grid; gap: 10px; }
+.alarma { text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--warn); border-radius: 6px; padding: 14px 16px; box-shadow: var(--shadow); }
+.alarma.critica { border-left-color: var(--crit); background: linear-gradient(90deg, var(--crit-bg), #fff 42%); }
+.alarma.aviso { background: linear-gradient(90deg, var(--warn-bg), #fff 42%); }
+.alarma:hover { border-color: var(--orange); border-left-color: inherit; }
+.alarma .l1 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.sev { font: 700 9.5px/1 var(--display); letter-spacing: .12em; padding: 5px 8px; border-radius: 3px; text-transform: uppercase; }
+.sev.critica { background: var(--crit); color: #fff; }
+.sev.aviso { background: var(--warn); color: #fff; }
+.alarma .obra { font: 700 11px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; }
+.alarma .t { font-weight: 600; }
+.alarma .l2 { color: var(--ink-2); font-size: 13.5px; margin: 6px 0 8px; }
+.ok-box { border: 1px dashed var(--orange-line); background: var(--orange-tint); border-radius: 6px; padding: 16px; font-size: 14px; }
+
+/* Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; line-height: 1.3; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); background: var(--wash); color: var(--ink); }
+.chip .c { font: 700 9px/1 var(--display); letter-spacing: .06em; color: var(--ink-2); }
+.chip .m { font: 600 12px/1 var(--body); letter-spacing: 0; }
+.chip .dia { width: 7px; height: 7px; background: currentColor; transform: rotate(45deg); flex: none; margin: 0 2px; }
+.chip.hecha { background: var(--good-bg); border-color: #BFE3C9; color: #17532A; }
+.chip.hecha .c { color: var(--good); }
+.chip.atrasada { border-color: var(--crit); background: var(--crit-bg); color: var(--crit); }
+.chip.abierta.ehito { border-color: var(--crit); font-weight: 600; }
+
+/* Selector de obra */
+.tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.obras { display: flex; flex-wrap: wrap; gap: 8px; }
+.obra-btn { background: var(--paper); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 14px; text-align: left; min-width: 150px; min-height: 44px; }
+.obra-btn[aria-pressed="true"] { border-color: var(--orange); background: var(--orange-tint); box-shadow: inset 0 -4px 0 var(--orange); }
+.obra-btn .nm { font: 700 11px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+.obra-btn .pg { margin-top: 8px; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.obra-btn .pg i { display: block; height: 100%; background: var(--orange); }
+.obra-btn .mt { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--crit); display: inline-block; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); min-height: 44px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--orange-strong); }
+
+/* Ruta de hitos */
+.ruta { list-style: none; margin: 0; padding: 0; position: relative; }
+.ruta::before { content: ""; position: absolute; left: 21px; top: 8px; bottom: 8px; width: 3px; background: var(--line); }
+.hito { position: relative; padding: 0 0 14px 60px; }
+.hito .nodo { position: absolute; left: 0; top: 4px; width: 44px; height: 44px; border-radius: 50%; background: var(--paper); border: 3px solid var(--orange); display: grid; place-items: center; font: 700 10px/1 var(--display); letter-spacing: .02em; color: var(--orange-strong); }
+.hito.hecha .nodo { background: var(--orange); color: #fff; }
+.hito.critica .nodo, .hito.aviso .nodo { border-color: var(--crit); }
+.hito.critica.hecha .nodo { background: var(--crit); }
+.hito.aviso.hecha .nodo { background: var(--warn); border-color: var(--warn); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; box-shadow: var(--shadow); }
+.card .l1 { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.card .nm { font-weight: 600; }
+.card .nm .cd { font: 700 10px/1 var(--display); letter-spacing: .08em; color: var(--orange-strong); margin-right: 8px; }
+.est { font: 700 9.5px/1 var(--display); letter-spacing: .1em; padding: 5px 8px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; }
+.est.hecha { background: var(--good-bg); color: var(--good); }
+.est.abierta { background: var(--wash); color: var(--ink-2); border: 1px solid var(--line); }
+.est.atrasada { background: var(--crit-bg); color: var(--crit); }
+.card .tt { font: 700 9px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+.alerta { margin-top: 10px; padding: 10px 12px; border-radius: 4px; font-size: 13.5px; border-left: 4px solid var(--warn); background: var(--warn-bg); }
+.alerta.critica { border-left-color: var(--crit); background: var(--crit-bg); }
+.alerta strong { font: 700 10px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--ink-2); margin: 0 0 14px; }
+.leyenda .chip { pointer-events: none; }
+details.mas { margin-top: 18px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; background: var(--wash); }
+details.mas summary { cursor: pointer; font: 700 10px/1.4 var(--display); letter-spacing: .1em; text-transform: uppercase; min-height: 28px; }
+details.mas p, details.mas ul { font-size: 13.5px; color: var(--ink-2); }
+
+footer { border-top: 6px solid var(--orange); background: var(--wash); padding: 26px 0 40px; font-size: 13px; color: var(--ink-2); }
+footer h3 { font: 700 11px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 10px; color: var(--ink); }
+footer .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+footer p { margin: 0 0 8px; }
+
+@media (max-width: 860px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  footer .cols { grid-template-columns: 1fr; gap: 16px; }
+  .corte { text-align: left; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 0 16px; }
+  .kpi .n { font-size: 27px; }
+  .obra-btn { min-width: 0; flex: 1 1 calc(50% - 8px); }
+  .hito { padding-left: 52px; }
+  .hito .nodo { width: 38px; height: 38px; font-size: 9px; }
+  .ruta::before { left: 18px; }
+}
+@media print { .top, footer { border-width: 3px; } .alarma, .card { box-shadow: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div>
+      <div class="crumbs" id="crumbs"></div>
+      <h1 class="brand"><b>CHECK</b>S</h1>
+      <p class="tag">Control de hitos de obra · cada tarea ligada a su hito</p>
+    </div>
+    <div class="corte"><strong>Corte de datos</strong><span id="corte"></span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section aria-labelledby="h-kpi">
+    <h2 class="sec" id="h-kpi">Estado de obras activas</h2>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section aria-labelledby="h-al">
+    <h2 class="sec" id="h-al">Alarmas de hitos</h2>
+    <p class="sub">Un hito quedó cerrado pero hay tareas u otros hitos anteriores sin cerrar. <strong>Crítica</strong> si entre lo abierto hay otro hito; <strong>aviso</strong> si son solo tareas.</p>
+    <div class="alarmas" id="alarmas"></div>
+  </section>
+
+  <section aria-labelledby="h-ob">
+    <h2 class="sec" id="h-ob">Ruta de hitos por obra</h2>
+    <div class="tools">
+      <div class="obras" id="obras" role="group" aria-label="Obra"></div>
+      <label class="toggle"><input type="checkbox" id="ver-term"> Mostrar obras terminadas</label>
+    </div>
+    <div class="leyenda" aria-hidden="true">
+      <span class="chip hecha"><span class="c m">✓</span> cerrada</span>
+      <span class="chip abierta"><span class="c m">○</span> abierta</span>
+      <span class="chip atrasada"><span class="c m">!</span> atrasada</span>
+      <span class="chip abierta ehito"><span class="dia"></span> hito abierto</span>
+    </div>
+    <ol class="ruta" id="ruta"></ol>
+    <div id="extras"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h3>Cómo se lee</h3>
+        <p>Los <strong>hitos</strong> (milestones de Asana) van en orden constructivo. Cada tarea cuelga del <strong>primer hito que libera</strong>. Si un hito se cierra con algo anterior abierto, salta la alarma.</p>
+      </div>
+      <div>
+        <h3>Fuente</h3>
+        <p id="fuente"></p>
+        <p>Los datos son una foto a la fecha de corte; no se consulta nada en vivo.</p>
+      </div>
+      <div>
+        <h3>Ecosistema</h3>
+        <p>CHECKS alimentará el tablero de ORRISA y este, a su vez, el de TUCAN. Los datos viajan en un solo esquema (<code>checks-datos.json</code>, esquema v<span id="esq"></span>) para sumarse sin retrabajo.</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const D = /*__DATA__*/null;
+
+const $ = s => document.querySelector(s);
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'class') e.className = v;
+    else if (k === 'on') for (const [ev, f] of Object.entries(v)) e.addEventListener(ev, f);
+    else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  kids.flat().forEach(c => { if (c != null && c !== false) e.append(c instanceof Node ? c : document.createTextNode(c)); });
+  return e;
+}
+const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const fmt = d => { if (!d) return ''; const [y, m, dd] = d.split('-').map(Number); return dd + ' ' + MES[m - 1]; };
+const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
+
+let obraSel = null, verTerm = false;
+const visibles = () => D.obras.filter(o => verTerm || !o.terminada);
+const activas = () => D.obras.filter(o => !o.terminada);
+const alarmasDe = o => o.hitos.filter(x => x.severidad);
+
+function chip(t) {
+  const cls = ['chip', t.hecha ? 'hecha' : (t.atrasada ? 'atrasada' : 'abierta'), t.hito ? 'ehito' : ''].join(' ');
+  const mark = t.hecha ? '✓' : (t.atrasada ? '!' : (t.hito ? '' : '○'));
+  const title = t.hecha ? 'Cerrada' + (t.cerrada ? ' el ' + fmt(t.cerrada) : '') : (t.vence ? 'Vence ' + fmt(t.vence) : 'Abierta');
+  return h('span', { class: cls, title }, h('span', { class: mark ? 'c m' : 'dia' }, mark), h('span', { class: 'c' }, t.codigo), t.nombre);
+}
+
+function renderCrumbs() {
+  const c = $('#crumbs'); c.replaceChildren();
+  D.cadena.forEach((x, i) => { if (i) c.append(h('i', {}, '›')); c.append(h('span', {}, x)); });
+  $('#corte').textContent = new Date(D.corte + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  $('#fuente').textContent = D.fuente;
+  $('#esq').textContent = D.esquema;
+}
+
+function renderKpis() {
+  const A = activas();
+  const hh = A.reduce((s, o) => s + o.hitosHechos, 0), ht = A.reduce((s, o) => s + o.hitosTotal, 0);
+  const al = A.flatMap(o => alarmasDe(o)), cr = al.filter(x => x.severidad === 'critica').length;
+  const atr = A.reduce((s, o) => s + o.atrasadas, 0);
+  const K = (lb, n, small, ft, cls) => h('div', { class: 'kpi ' + (cls || '') }, h('div', { class: 'lb' }, lb),
+    h('div', { class: 'n' }, n, small ? h('small', {}, small) : null), h('div', { class: 'ft' }, ft));
+  $('#kpis').replaceChildren(
+    K('Obras activas', String(A.length), '', A.map(o => o.nombre).join(' · ')),
+    K('Hitos cerrados', String(hh), ' / ' + ht, ht ? Math.round(hh / ht * 100) + '% de los hitos de obras activas' : ''),
+    K('Alarmas activas', String(al.length), '', plural(cr, 'crítica', 'críticas') + ' · ' + plural(al.length - cr, 'aviso', 'avisos'), al.length ? 'crit' : ''),
+    K('Tareas atrasadas', String(atr), '', 'Abiertas con fecha vencida al corte', atr ? 'crit' : ''));
+}
+
+function renderAlarmas() {
+  const box = $('#alarmas'); box.replaceChildren();
+  const lista = visibles().flatMap(o => alarmasDe(o).map(x => ({ o, x })))
+    .sort((a, b) => (a.x.severidad === 'critica' ? 0 : 1) - (b.x.severidad === 'critica' ? 0 : 1) || a.o.nombre.localeCompare(b.o.nombre) || a.x.orden - b.x.orden);
+  if (!lista.length) { box.append(h('div', { class: 'ok-box' }, 'Sin alarmas: ningún hito cerrado tiene tareas anteriores abiertas.')); return; }
+  for (const { o, x } of lista) {
+    box.append(h('button', { class: 'alarma ' + x.severidad, type: 'button', on: { click: () => { obraSel = o.id; renderObras(); renderRuta(); document.getElementById('h-ob').scrollIntoView({ behavior: 'smooth' }); } } },
+      h('div', { class: 'l1' }, h('span', { class: 'sev ' + x.severidad }, x.severidad === 'critica' ? 'Crítica' : 'Aviso'),
+        h('span', { class: 'obra' }, o.nombre), h('span', { class: 't' }, x.codigo + ' · ' + x.nombre)),
+      h('div', { class: 'l2' }, 'Hito cerrado el ' + fmt(x.cerrada) + ' con ' + plural(x.alarmas.length, 'elemento anterior abierto', 'elementos anteriores abiertos') + ':'),
+      h('div', { class: 'chips' }, x.alarmas.map(a => chip({ ...a, hecha: false })))));
+  }
+}
+
+function renderObras() {
+  const vis = visibles();
+  if (!vis.find(o => o.id === obraSel)) obraSel = (vis.find(o => alarmasDe(o).length) || vis[0]).id;
+  const box = $('#obras'); box.replaceChildren();
+  for (const o of vis) {
+    const pct = o.hitosTotal ? Math.round(o.hitosHechos / o.hitosTotal * 100) : 0;
+    const n = alarmasDe(o).length;
+    box.append(h('button', { class: 'obra-btn', type: 'button', 'aria-pressed': String(o.id === obraSel), on: { click: () => { obraSel = o.id; renderObras(); renderRuta(); } } },
+      h('div', { class: 'nm' }, o.nombre, n ? h('span', { class: 'dot', title: plural(n, 'alarma', 'alarmas') }) : null),
+      h('div', { class: 'pg' }, h('i', { style: 'width:' + pct + '%' })),
+      h('div', { class: 'mt' }, o.hitosHechos + '/' + o.hitosTotal + ' hitos' + (o.terminada ? ' · terminada' : ''))));
+  }
+}
+
+function renderRuta() {
+  const o = D.obras.find(x => x.id === obraSel);
+  const ol = $('#ruta'); ol.replaceChildren();
+  o.hitos.forEach((x, i) => {
+    const est = x.hecha ? 'hecha' : (x.atrasada ? 'atrasada' : 'abierta');
+    const estTxt = x.hecha ? 'Cerrado' + (x.cerrada ? ' · ' + fmt(x.cerrada) : '') : (x.atrasada ? 'Atrasado · vencía ' + fmt(x.vence) : 'Abierto' + (x.vence ? ' · vence ' + fmt(x.vence) : ''));
+    ol.append(h('li', { class: 'hito ' + (x.hecha ? 'hecha ' : '') + (x.severidad || '') },
+      h('div', { class: 'nodo', 'aria-hidden': 'true' }, String(i + 1)),
+      h('div', { class: 'card' },
+        h('div', { class: 'l1' }, h('div', { class: 'nm' }, h('span', { class: 'cd' }, x.codigo), x.nombre), h('span', { class: 'est ' + est }, estTxt)),
+        x.tareas.length ? [h('div', { class: 'tt' }, 'Tareas que liberan este hito'), h('div', { class: 'chips' }, x.tareas.map(chip))] : null,
+        x.severidad ? h('div', { class: 'alerta ' + x.severidad }, h('strong', {}, 'Alarma · cerrado con lo anterior abierto'),
+          h('div', { class: 'chips' }, x.alarmas.map(a => chip({ ...a, hecha: false })))) : null)));
+  });
+  const ex = $('#extras'); ex.replaceChildren();
+  const bloques = [];
+  if (o.huerfanas.length) bloques.push(['Tareas después del último hito', o.huerfanas]);
+  if (o.sinEquiv.length) bloques.push(['Sin equivalencia en la plantilla (' + o.sinEquiv.length + ')', o.sinEquiv.map(s => ({ codigo: '—', nombre: s.nombre, hecha: s.hecha }))]);
+  if (o.fuera.length) bloques.push(['Cierres fuera de orden, informativo (' + o.fuera.length + ')', o.fuera.map(f => ({ codigo: f.codigo, nombre: f.nombre + ' — cerrada ' + fmt(f.cerrada) + ', después de ' + f.hito + ' (' + fmt(f.hitoCerrado) + ')', hecha: true }))]);
+  for (const [t, arr] of bloques) ex.append(h('details', { class: 'mas' }, h('summary', {}, t), h('div', { class: 'chips', style: 'margin-top:8px' }, arr.map(chip))));
+}
+
+$('#ver-term').addEventListener('change', e => { verTerm = e.target.checked; renderObras(); renderAlarmas(); renderRuta(); });
+window.CHECKS = D;
+renderCrumbs(); renderKpis(); renderAlarmas(); renderObras(); renderRuta();
+</script>
+</body>
+</html>

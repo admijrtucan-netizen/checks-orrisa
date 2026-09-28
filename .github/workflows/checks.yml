@@ -1,0 +1,74 @@
+name: CHECKS · actualizar tablero
+
+# Lee ASANA.tareas de BigQuery, recalcula hitos y alarmas, y publica checks.html
+# + checks-datos.json en el bucket. Los avisos de calidad de datos se reportan en
+# un Issue y NO detienen la publicacion.
+on:
+  schedule:
+    - cron: '15 * * * *'      # cada hora, al minuto 15 (UTC)
+  workflow_dispatch:           # boton "Run workflow" para correrlo a mano
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: checks-actualizar
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: bases-de-datos-sheets
+  BUCKET: loro-orrisa
+  TZ: America/Merida
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Secreto GCP_SA_KEY = llave JSON de la cuenta de servicio loro-conciliacion.
+      # Necesita: BigQuery Job User (proyecto) + BigQuery Data Viewer (dataset ASANA)
+      # + Storage Object Admin sobre el bucket.
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Consultar tareas de Asana en BigQuery
+        run: |
+          bq --project_id="$GCP_PROJECT" --quiet query --use_legacy_sql=false \
+             --format=json --max_rows=100000 < checks/consulta.sql > tareas.json
+          echo "filas: $(node -e "console.log(require('./tareas.json').length)")"
+
+      - name: Generar tablero
+        run: node checks/checks_build.js tareas.json "$(date +%F)" salida | tee salida/log.txt
+
+      - name: Publicar en el bucket
+        run: |
+          gcloud storage cp salida/checks.html salida/checks-datos.json "gs://$BUCKET/" \
+            --cache-control="no-cache, max-age=0"
+          echo "https://storage.googleapis.com/$BUCKET/checks.html" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Avisos de datos (Issue)
+        if: always() && hashFiles('salida/checks-avisos.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node checks/avisos_md.js salida/checks-avisos.json > salida/avisos.md
+          cat salida/avisos.md >> "$GITHUB_STEP_SUMMARY"
+          total=$(node -e "console.log(require('./salida/checks-avisos.json').total)")
+          gh label create checks-avisos --color F26B21 --description "CHECKS: datos que el mapeo no supo interpretar" --force >/dev/null 2>&1 || true
+          n=$(gh issue list --state open --label checks-avisos --json number --jq '.[0].number // empty')
+          if [ "$total" -gt 0 ]; then
+            if [ -n "$n" ]; then gh issue edit "$n" --body-file salida/avisos.md
+            else gh issue create --title "CHECKS: avisos de datos" --label checks-avisos --body-file salida/avisos.md; fi
+          elif [ -n "$n" ]; then
+            gh issue close "$n" --comment "Sin avisos en la última corrida."
+          fi
