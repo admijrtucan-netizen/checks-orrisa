@@ -1,12 +1,26 @@
-name: CHECKS · actualizar tablero
+name: CHECKS · actualizar tablero y alertas
 
-# Lee ASANA.tareas de BigQuery, recalcula hitos y alarmas, y publica checks.html
-# + checks-datos.json en el bucket. Los avisos de calidad de datos se reportan en
-# un Issue y NO detienen la publicacion.
+# Lee ASANA.tareas de BigQuery, recalcula hitos y alarmas, publica el tablero y
+# manda al webhook las alertas NUEVAS (o resueltas). Los avisos de calidad de datos
+# se reportan en un Issue y NO detienen la publicacion.
+#
+# Cuando corre:
+#   - repository_dispatch "asana-cambio": tiempo casi real. Lo dispara n8n cuando
+#     Asana avisa que se cerro una tarea o un hito (ver README).
+#   - schedule cada hora: red de seguridad por si un aviso de Asana se pierde.
+#   - workflow_dispatch: a mano (con modo normal, todo o prueba).
 on:
   schedule:
-    - cron: '15 * * * *'      # cada hora, al minuto 15 (UTC)
-  workflow_dispatch:           # boton "Run workflow" para correrlo a mano
+    - cron: '15 * * * *'
+  repository_dispatch:
+    types: [asana-cambio]
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'normal = solo lo nuevo · todo = reenviar TODAS las alertas activas · prueba = un evento de prueba'
+        type: choice
+        options: [normal, todo, prueba]
+        default: normal
 
 permissions:
   contents: read
@@ -36,8 +50,6 @@ jobs:
 
       # Secreto GCP_SA_KEY = llave JSON de la cuenta de servicio de CHECKS
       # (checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com).
-      # Necesita: BigQuery Job User (proyecto) + BigQuery Data Viewer (dataset ASANA)
-      # + Storage Object Admin sobre el bucket.
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -50,14 +62,34 @@ jobs:
              --format=json --max_rows=100000 < checks/consulta.sql > tareas.json
           echo "filas: $(node -e "console.log(require('./tareas.json').length)")"
 
-      - name: Generar tablero
+      - name: Traer el estado de la corrida anterior
+        run: |
+          mkdir -p previo
+          gcloud storage cp "gs://$BUCKET/checks-estado.json" previo/estado.json 2>/dev/null \
+            || echo "sin estado previo: primera corrida"
+
+      - name: Generar tablero y alertas
         run: node checks/checks_build.js tareas.json "$(date +%F)" salida | tee salida/log.txt
 
-      - name: Publicar en el bucket
+      - name: Publicar tablero
         run: |
           gcloud storage cp salida/checks.html salida/checks-datos.json "gs://$BUCKET/" \
             --cache-control="no-cache, max-age=0"
           echo "https://storage.googleapis.com/$BUCKET/checks.html" >> "$GITHUB_STEP_SUMMARY"
+
+      # Va DESPUES de publicar y ANTES de guardar el estado: si el envio falla,
+      # el estado no avanza y las alertas se reintentan en la siguiente corrida.
+      - name: Enviar alertas al webhook
+        id: enviar
+        env:
+          CHECKS_WEBHOOK_URL: ${{ secrets.CHECKS_WEBHOOK_URL }}
+          TABLERO_URL: https://storage.googleapis.com/${{ vars.CHECKS_BUCKET || 'checks-orrisa' }}/checks.html
+          MODO: ${{ inputs.modo || 'normal' }}
+        run: node checks/checks_enviar.js salida/checks-alertas.json previo/estado.json salida/checks-datos.json
+
+      - name: Guardar estado
+        if: steps.enviar.outputs.avanzar == 'true'
+        run: gcloud storage cp salida/checks-estado.json "gs://$BUCKET/checks-estado.json" --cache-control="no-cache, max-age=0"
 
       - name: Avisos de datos (Issue)
         if: always() && hashFiles('salida/checks-avisos.json') != ''

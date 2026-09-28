@@ -27,6 +27,7 @@ const obras = L.OBRAS.map(o => {
   return { id: o.id, nombre: o.nombre, terminada: !!o.terminada, ...e };
 }).filter(o => o.hitosTotal > 0);   // una obra sin hitos mapeados no aporta a la ruta
 const avisos = L.diagnosticar(filas, corte);
+const alertas = require('./alertas.js').calcular(obras, avisos, corte);
 
 const datos = {
   marca: 'CHECKS', empresa: 'ORRISA', cadena: ['TUCAN', 'ORRISA', 'CHECKS'],
@@ -41,6 +42,11 @@ const json = JSON.stringify(datos).replace(/</g, '\\u003c');
 const out = n => path.join(salida, n);
 fs.writeFileSync(out('checks.html'), plantilla.replace('/*__DATA__*/null', () => json));
 fs.writeFileSync(out('checks-datos.json'), JSON.stringify(datos, null, 1));
+// alertas.json = lo que se manda al webhook (privado, no se publica).
+// estado.json  = solo las claves de las alertas activas: la siguiente corrida lo
+// compara para avisar unicamente lo nuevo o lo resuelto.
+fs.writeFileSync(out('checks-alertas.json'), JSON.stringify({ corte, alertas }, null, 1));
+fs.writeFileSync(out('checks-estado.json'), JSON.stringify({ corte, generado: datos.generado, claves: alertas.map(a => a.clave) }, null, 1));
 fs.writeFileSync(out('checks-avisos.json'), JSON.stringify({ corte, total: avisos.length, avisos }, null, 1));
 fs.writeFileSync(out('checklist-base-hitos.csv'), '﻿' + 'orden,codigo,tipo,linea,nombre,gid_asana\n' +
   L.BASE.map(b => [b.orden, b.codigo, b.hito ? 'HITO' : 'tarea', b.linea, '"' + b.nombre + '"', b.gid].join(',')).join('\n') + '\n');
@@ -50,6 +56,8 @@ for (const o of obras) {
   console.log('%s hitos %d/%d alarmas %d', o.nombre.padEnd(18), o.hitosHechos, o.hitosTotal, al.length);
 }
 console.log('%d tareas leidas · corte %s · checks.html %d KB', filas.length, corte, Math.round(fs.statSync(out('checks.html')).size / 1024));
+console.log('%d alerta(s) activa(s): %s', alertas.length,
+  Object.entries(alertas.reduce((m, a) => (m[a.tipo] = (m[a.tipo] || 0) + 1, m), {})).map(([k, v]) => k + ' ' + v).join(' · '));
 if (avisos.length) {
   console.log('\n%d AVISO(S) DE DATOS:', avisos.length);
   for (const a of avisos) console.log('  [%s] %s', a.tipo, a.detalle);
