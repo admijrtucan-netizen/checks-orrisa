@@ -42,7 +42,7 @@ CHECKS lleva su **propio bucket y su propia cuenta de servicio**, con nombre de 
    gcloud iam service-accounts create checks-orrisa --project=bases-de-datos-sheets
    SA=checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com
    gcloud projects add-iam-policy-binding bases-de-datos-sheets --member=serviceAccount:$SA --role=roles/bigquery.jobUser
-   bq add-iam-policy-binding --member=serviceAccount:$SA --role=roles/bigquery.dataViewer bases-de-datos-sheets:ASANA
+   bq query --use_legacy_sql=false --project_id=bases-de-datos-sheets "GRANT \`roles/bigquery.dataViewer\` ON SCHEMA \`bases-de-datos-sheets.ASANA\` TO 'serviceAccount:$SA'"
    gcloud storage buckets add-iam-policy-binding gs://checks-orrisa --member=serviceAccount:$SA --role=roles/storage.objectAdmin
    ```
 3. **Secretos** del repo (Settings → Secrets and variables → Actions → Secrets):
