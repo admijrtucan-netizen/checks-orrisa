@@ -23,9 +23,10 @@ Workflow: `.github/workflows/checks.yml`. Corre en tres casos:
 
 | Disparador | Para qué |
 |---|---|
-| `repository_dispatch` `asana-cambio` | **Tiempo casi real.** n8n lo dispara cuando Asana avisa un cambio (ver abajo). |
-| Cada hora (minuto 15 UTC) | Red de seguridad si un aviso de Asana se pierde. |
+| **Lunes, miércoles y viernes, 06:15 hora de Mérida** (`15 12 * * 1,3,5` UTC) | Actualización programada del tablero y envío de alertas. |
 | A mano (Actions → Run workflow) | Con `modo`: `normal`, `todo` (reenvía todas las activas) o `prueba` (un evento de prueba). |
+
+**Frescura de los datos.** El tablero solo es tan reciente como su última corrida (como máximo, 2 a 3 días de atraso). La tabla `ASANA.tareas` de BigQuery la sincroniza otro proceso, más seguido que eso; CHECKS solo lee lo que ya esté ahí. Para ver algo al momento, correr el workflow a mano.
 
 ## Puesta en marcha (una sola vez)
 
@@ -59,7 +60,7 @@ Solo se envía lo que **cambia** desde la corrida anterior: una alerta nueva se 
 | `hito-sin-anteriores` | **crítica** si lo abierto incluye otro hito · **aviso** si son solo tareas | Un hito se cerró con tareas u hitos anteriores (de su misma línea) sin cerrar. **Es la alarma principal.** |
 | `hito-atrasado` | aviso | Un hito abierto ya pasó su fecha de vencimiento. |
 | `obra-estancada` | aviso | Una obra activa lleva **7 días o más** sin cerrar ninguna tarea ni hito. |
-| `cierre-masivo` | info | **5 o más** tareas/hitos cerrados el mismo día en una obra (últimos 3 días): puede ser un cierre en bloque sin ejecución real. |
+| `cierre-masivo` | info | **5 o más** tareas/hitos cerrados el mismo día en una obra (últimos 4 días): puede ser un cierre en bloque sin ejecución real. |
 | `aviso-datos` | info | Una obra nueva, un código desconocido o una tarea sin equivalencia: el mapeo no supo interpretarla. |
 
 Los umbrales están en `checks/alertas.js` (`UMBRAL`). Solo se alertan las **obras activas**.
@@ -86,19 +87,9 @@ Los umbrales están en `checks/alertas.js` (`UMBRAL`). Solo se alertan las **obr
 
 **Privacidad:** los eventos **no incluyen responsables ni nombres de personas**, solo obra, códigos, nombres de tarea y fechas.
 
-## Tiempo real: que n8n dispare la corrida
+## Por qué solo 3 veces por semana
 
-GitHub no puede enterarse solo de que Asana cambió. La forma de tener respuesta casi inmediata es que **n8n** avise:
-
-1. En n8n, un nodo **Asana Trigger** sobre el proyecto *CHECKLIST'S DE OBRAS* (evento: tarea cambiada/completada).
-2. Un nodo **HTTP Request** con:
-   - `POST https://api.github.com/repos/admijrtucan-netizen/checks-orrisa/dispatches`
-   - Headers: `Accept: application/vnd.github+json` y `Authorization: Bearer <token>` (token fino de GitHub limitado a este repo con permiso **Contents: Read and write**).
-   - Body: `{"event_type":"asana-cambio"}`
-
-⚠️ **Retraso real.** El dato llega a BigQuery por el sync de Asana, que no es instantáneo. Si el disparo llega antes de que BigQuery tenga el cierre, esa corrida no lo verá y lo recogerá la de la siguiente hora. Conviene medir cuánto tarda el sync y, si hace falta, poner una espera de 1–2 minutos en n8n antes del disparo.
-
-**Minutos de GitHub Actions:** cada corrida dura ~1 minuto. Un repo **privado** en plan gratuito tiene 2,000 min/mes; un disparo por cada cambio de Asana puede pasarse. Si ocurre, conviene filtrar en n8n solo el cierre de tareas (no cualquier edición) o pasar el repo a público (sin límite).
+Las alertas de este tablero son de seguimiento de obra (un hito cerrado sin lo anterior, atrasos, obras detenidas), no de emergencia, así que L-M-V es suficiente. Son ~12 corridas al mes, muy por debajo del límite gratuito de minutos de GitHub Actions. Si más adelante se quiere mayor frecuencia, basta cambiar el `cron` de `.github/workflows/checks.yml`.
 
 ## Qué NO se actualiza solo
 

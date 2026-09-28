@@ -9,7 +9,7 @@
 const UMBRAL = {
   estancada_dias: 7,      // obra activa sin ningun cierre en estos dias
   masivo_cierres: 5,      // tareas cerradas el mismo dia en una obra
-  masivo_ventana: 3,      // solo se mira el cierre masivo de los ultimos N dias
+  masivo_ventana: 4,      // solo se mira el cierre masivo de los ultimos N dias (la corrida es L-M-V: el hueco maximo es de 3 dias)
 };
 
 const dias = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
