@@ -2,7 +2,7 @@
 
 Tablero de **hitos de obra** de Orrisa: cada tarea del checklist queda ligada al hito que libera, y salta una **alarma** cuando un hito se cierra con algo anterior abierto.
 
-Se publica en `https://storage.googleapis.com/loro-orrisa/checks.html` y se actualiza solo cada hora.
+Se publica en `https://storage.googleapis.com/checks-orrisa/checks.html` y se actualiza solo cada hora.
 
 ## Cómo funciona
 
@@ -12,7 +12,7 @@ Asana ──(sync)──► BigQuery  ASANA.tareas
                        ▼
               checks/checks_build.js ──► checks.html + checks-datos.json + checks-avisos.json
                        │
-        gcloud storage cp ──► gs://loro-orrisa/      (público)
+        gcloud storage cp ──► gs://checks-orrisa/    (público)
                        └────► Issue "CHECKS: avisos de datos" (si hay avisos)
 ```
 
@@ -20,12 +20,23 @@ Workflow: `.github/workflows/checks.yml` — cada hora (minuto 15 UTC) y a mano 
 
 ## Puesta en marcha (una sola vez)
 
-1. **Secreto** `GCP_SA_KEY` (Settings → Secrets and variables → Actions): la llave JSON de la cuenta de servicio `loro-conciliacion@bases-de-datos-sheets.iam.gserviceaccount.com`.
-2. **Permisos de esa cuenta** (si no los tiene ya):
-   - `BigQuery Job User` en el proyecto `bases-de-datos-sheets`.
-   - `BigQuery Data Viewer` sobre el dataset `ASANA`.
-   - `Storage Object Admin` sobre el bucket `loro-orrisa`.
-3. Correr el workflow a mano una vez y revisar el resumen de la corrida.
+CHECKS lleva su **propio bucket y su propia cuenta de servicio**, con nombre de CHECKS, para que nada de su URL ni de sus permisos dependa de otros tableros.
+
+1. **Crear el bucket** público de solo lectura (`checks-orrisa`, o el nombre que se quiera; en ese caso definir la variable de repo `CHECKS_BUCKET`):
+   ```bash
+   gcloud storage buckets create gs://checks-orrisa --project=bases-de-datos-sheets --location=US --uniform-bucket-level-access
+   gcloud storage buckets add-iam-policy-binding gs://checks-orrisa --member=allUsers --role=roles/storage.objectViewer
+   ```
+2. **Crear la cuenta de servicio** `checks-orrisa` y darle permisos mínimos:
+   ```bash
+   gcloud iam service-accounts create checks-orrisa --project=bases-de-datos-sheets
+   SA=checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com
+   gcloud projects add-iam-policy-binding bases-de-datos-sheets --member=serviceAccount:$SA --role=roles/bigquery.jobUser
+   bq add-iam-policy-binding --member=serviceAccount:$SA --role=roles/bigquery.dataViewer bases-de-datos-sheets:ASANA
+   gcloud storage buckets add-iam-policy-binding gs://checks-orrisa --member=serviceAccount:$SA --role=roles/storage.objectAdmin
+   ```
+3. **Secreto** `GCP_SA_KEY` (Settings → Secrets and variables → Actions): la llave JSON de esa cuenta (`gcloud iam service-accounts keys create llave.json --iam-account=$SA`).
+4. Correr el workflow a mano una vez y revisar el resumen de la corrida.
 
 ## Avisos de datos
 

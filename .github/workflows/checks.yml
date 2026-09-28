@@ -18,7 +18,9 @@ concurrency:
 
 env:
   GCP_PROJECT: bases-de-datos-sheets
-  BUCKET: loro-orrisa
+  # Bucket propio de CHECKS. Se puede cambiar sin tocar codigo con la variable
+  # de repo CHECKS_BUCKET (Settings -> Secrets and variables -> Actions -> Variables).
+  BUCKET: ${{ vars.CHECKS_BUCKET || 'checks-orrisa' }}
   TZ: America/Merida
 
 jobs:
@@ -32,7 +34,8 @@ jobs:
         with:
           node-version: 22
 
-      # Secreto GCP_SA_KEY = llave JSON de la cuenta de servicio loro-conciliacion.
+      # Secreto GCP_SA_KEY = llave JSON de la cuenta de servicio de CHECKS
+      # (checks-orrisa@bases-de-datos-sheets.iam.gserviceaccount.com).
       # Necesita: BigQuery Job User (proyecto) + BigQuery Data Viewer (dataset ASANA)
       # + Storage Object Admin sobre el bucket.
       - uses: google-github-actions/auth@v2
